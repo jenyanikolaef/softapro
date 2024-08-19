@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Graph with Link Popup</title>
+    <style>
+        body {
+            background-color: #1e1e1e; /* Черный фон */
+            color: #cfcfcf; /* Светлый текст */
+            font-family: Arial, sans-serif;
+        }
+        #mynetwork {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #333;
+        }
+        /* Стили для всплывающего окна */
+        #popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            padding: 20px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        #popup input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+        }
+        #popup button {
+            padding: 8px;
+            background-color: #ff5733;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #popup button:hover {
+            background-color: #e04a1f;
+        }
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+    </style>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+    <div id="overlay"></div>
+    <div id="popup">
+        <h3>Enter Link for Node</h3>
+        <input type="text" id="linkInput" placeholder="Enter URL here">
+        <button id="saveButton">Save Link</button>
+    </div>
+    <div id="mynetwork"></div>
+    <script>
+        // Создание узлов
+        const nodesArray = [];
+        const edgesArray = [];
+
+        // Добавляем главные точки (Main)
+        for (let i = 1; i <= 10; i++) {
+            nodesArray.push({
+                id: i,
+                label: 'Main ' + i,
+                title: 'Click to set a link',
+                color: '#ff5733'
+            });
+
+            // Добавляем вторичные точки (Second) и связи с главными точками
+            for (let j = 1; j <= 2; j++) {
+                const secondId = (i - 1) * 2 + j + 10; // Начинаем нумерацию с 11
+                nodesArray.push({
+                    id: secondId,
+                    label: 'Second ' + (i * 10 + j),
+                    title: 'Click to visit nikolaef.ru',
+                    color: '#33cfff'
+                });
+                edgesArray.push({ from: i, to: secondId });
+
+                // Добавляем подчинённые точки (Sub) и связи с вторичными точками
+                for (let k = 1; k <= 2; k++) {
+                    const subId = (secondId - 11) * 2 + k + 30; // Начинаем нумерацию с 31
+                    nodesArray.push({
+                        id: subId,
+                        label: 'Sub ' + (secondId * 10 + k),
+                        title: 'Click to visit nikolaef.ru',
+                        color: '#ff33a1'
+                    });
+                    edgesArray.push({ from: secondId, to: subId });
+                }
+            }
+        }
+
+        // Добавляем связи между главными узлами
+        for (let i = 1; i <= 10; i++) {
+            for (let j = i + 1; j <= 10; j++) {
+                edgesArray.push({ from: i, to: j });
+            }
+        }
+
+        const nodes = new vis.DataSet(nodesArray);
+        const edges = new vis.DataSet(edgesArray);
+
+        const container = document.getElementById('mynetwork');
+        const data = {
+            nodes: nodes,
+            edges: edges
+        };
+
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 15,
+                color: {
+                    background: '#2d2d2d', // Цвет фона узлов
+                    border: '#444' // Цвет границы узлов
+                },
+                font: {
+                    color: '#cfcfcf' // Цвет текста узлов
+                },
+                borderWidth: 2 // Ширина границы узлов
+            },
+            edges: {
+                color: '#555', // Цвет связей
+                width: 1,
+                smooth: {
+                    type: 'continuous',
+                    forceDirection: 'vertical',
+                    roundness: 0 // Прямые линии
+                }
+            },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    theta: 0.1,
+                    gravitationalConstant: -13250,
+                    centralGravity: 0,
+                    springLength: 0,
+                    springConstant: 0.005,
+                    damping: 0.22,
+                    avoidOverlap: 0.45
+                },
+                maxVelocity: 56,
+                minVelocity: 0.41
+            }
+        };
+
+        const network = new vis.Network(container, data, options);
+
+        let selectedNodeId = null;
+
+        // Обработчик кликов на узлах
+        network.on('click', function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                if (nodes.get(nodeId).label.startsWith('Main')) {
+                    selectedNodeId = nodeId;
+                    showPopup();
+                }
+            }
+        });
+
+        // Функция для отображения всплывающего окна
+        function showPopup() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }
+
+        // Обработчик клика на кнопке "Save Link"
+        document.getElementById('saveButton').addEventListener('click', function() {
+            const link = document.getElementById('linkInput').value;
+            if (selectedNodeId && link) {
+                nodes.update({
+                    id: selectedNodeId,
+                    title: `Click to visit ${link}`
+                });
+                document.getElementById('linkInput').value = ''; // Очистка поля ввода
+                hidePopup();
+            }
+        });
+
+        // Функция для скрытия всплывающего окна
+        function hidePopup() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        // Обработчик клика на фоне (overlay) для закрытия всплывающего окна
+        document.getElementById('overlay').addEventListener('click', hidePopup);
+    </script>
+</body>
+</html>
